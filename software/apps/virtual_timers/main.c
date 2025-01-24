@@ -51,8 +51,19 @@ int main(void) {
   nrf_delay_ms(3000);
 
   // Set up some timers and see what happens
-  //virtual_timer_start_repeated(1000000, led1_toggle);
-  //virtual_timer_start_repeated(2000000, led2_toggle);
+  // virtual_timer_start(2000000, led1_toggle);
+  int timer_1 = virtual_timer_start_repeated(1000000, led1_toggle);
+  int timer_2 = virtual_timer_start_repeated(2000000, led2_toggle);
+  int timer_3 = virtual_timer_start_repeated(4000000, led3_toggle);
+
+  nrf_delay_ms(16000);
+  printf("cancelling timers 2 and 3\n");
+  virtual_timer_cancel(timer_2);
+  virtual_timer_cancel(timer_3);
+  nrf_delay_ms(4000);
+  printf("cancelling timer 1\n");
+  virtual_timer_cancel(timer_1);
+
 
   // loop forever
   while (1) {

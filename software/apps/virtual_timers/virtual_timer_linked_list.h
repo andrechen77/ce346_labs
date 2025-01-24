@@ -16,6 +16,12 @@ typedef struct node_t {
 
     // add your own variables here
 
+    virtual_timer_callback_t callback;
+
+    bool repeated;
+
+    uint32_t interval; // repeated timer interval in microseconds
+
     // *** Do not edit below this line ***
 
     // timer value in microseconds. Used to sort the list. Must be initialized
