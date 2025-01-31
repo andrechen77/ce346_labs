@@ -13,11 +13,14 @@
 
 int main(void) {
   printf("Board started!\n");
-  
+
   // initialize LED matrix driver
   led_matrix_init();
 
   // call other functions here
+  set_string("Hi CE346!", 9);
+  nrf_delay_ms(5000);
+  set_string("It works!", 9);
 
   // loop forever
   while (1) {

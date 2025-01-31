@@ -8,4 +8,5 @@
 void led_matrix_init(void);
 
 // You may need to add more functions here
+void set_string(const char* string, int length);
 
