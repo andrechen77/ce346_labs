@@ -19,7 +19,7 @@ int main(void) {
   // intialize drivers
   nrfx_gpiote_init();
   app_timer_init();
-  
+
   // start capacitive touch driver
   capacitive_touch_init();
 
@@ -29,6 +29,9 @@ int main(void) {
     nrf_delay_ms(100);
 
     // Add some stuff here to demonstrate that your driver works
+    bool is_touching = capacitive_touch_is_active();
+
+    printf("Touching: %d\n", is_touching);
   }
 }
 

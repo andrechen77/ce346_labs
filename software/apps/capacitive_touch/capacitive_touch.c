@@ -17,6 +17,7 @@
 
 // High-speed timer for timeout detection
 static nrfx_timer_t TIMER4 = NRFX_TIMER_INSTANCE(0);
+APP_TIMER_DEF(TIMER5);
 
 // Status of the touch sensor
 static bool touch_active = false;
@@ -25,12 +26,29 @@ static bool touch_active = false;
 static void gpio_handler(nrfx_gpiote_pin_t pin, nrf_gpiote_polarity_t action) {
   // Disable the GPIO interrupt event so you don't get multiple spurious events
   nrfx_gpiote_in_event_disable(TOUCH_LOGO);
+  nrfx_timer_pause(&TIMER4);
 
   // Implement me first!
+  nrfx_timer_capture(&TIMER4, NRF_TIMER_CC_CHANNEL0);
+  int timer_value = nrfx_timer_capture_get(&TIMER4, NRF_TIMER_CC_CHANNEL0);
+
+  if (timer_value < 100) {
+    touch_active = false;
+  } else {
+    touch_active = true;
+  }
+
+  printf("Timer value on touch: %d\n", timer_value);
 }
 
 static void timer_handler(nrf_timer_event_t event, void* context) {
-  // Implement in a later step
+  // clear timer interrupt
+  nrfx_gpiote_in_event_disable(TOUCH_LOGO);
+  nrfx_timer_pause(&TIMER4);
+
+  touch_active = true;
+
+  printf("timed out\n");
 }
 
 // Helper function for starting a test
@@ -38,15 +56,22 @@ static void timer_handler(nrf_timer_event_t event, void* context) {
 //  1. Driving the pad low
 //  2. Changing to an input and allowing it to float high
 //  3. Either triggering a GPIO interrupt when it becomes high or timing out
-static void start_capacitive_test(void) {
+static void start_capacitive_test(void* context) {
+  printf("Starting capacitive test\n");
+
   // set pin as input and clear it
   nrf_gpio_cfg(TOUCH_LOGO, NRF_GPIO_PIN_DIR_OUTPUT, NRF_GPIO_PIN_INPUT_DISCONNECT,
-      NRF_GPIO_PIN_NOPULL, NRF_GPIO_PIN_S0S1, NRF_GPIO_PIN_NOSENSE);
+    NRF_GPIO_PIN_NOPULL, NRF_GPIO_PIN_S0S1, NRF_GPIO_PIN_NOSENSE);
   nrf_gpio_pin_clear(TOUCH_LOGO);
 
   // clear and resume timeout timer
   nrfx_timer_clear(&TIMER4);
   nrfx_timer_resume(&TIMER4);
+
+  int normal_rise_time = 67; // microseconds
+  int timeout = normal_rise_time * 10;
+  nrfx_timer_compare(&TIMER4, NRF_TIMER_CC_CHANNEL1, nrfx_timer_us_to_ticks(&TIMER4, timeout), true);
+  nrfx_timer_compare_int_enable(&TIMER4, NRF_TIMER_CC_CHANNEL1);
 
   // re-initialize and enable GPIO interrupt event
   nrfx_gpiote_in_config_t in_config = NRFX_GPIOTE_CONFIG_IN_SENSE_LOTOHI(true); // high-accuracy mode
@@ -73,8 +98,8 @@ void capacitive_touch_init(void) {
   nrfx_timer_enable(&TIMER4);
   nrfx_timer_pause(&TIMER4);
 
-  // start the touch test
-  start_capacitive_test();
+  app_timer_create(&TIMER5, APP_TIMER_MODE_REPEATED, start_capacitive_test);
+  app_timer_start(TIMER5, 32768 / 2, NULL);
 }
 
 // Determines whether the logo is being touched
