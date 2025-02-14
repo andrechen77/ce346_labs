@@ -31,7 +31,7 @@ static const nrfx_pwm_t PWM_INST = NRFX_PWM_INSTANCE(0);
 // Note: this is a 62.5 kB buffer (almost half of RAM)
 #define SAMPLING_FREQUENCY 16000 // 16 kHz sampling rate
 #define BUFFER_SIZE 32000 // two seconds worth of data
-uint16_t samples[BUFFER_SIZE] = {0}; // stores ADC samples and PWM duty cycle values
+uint16_t samples[BUFFER_SIZE] = { 0 }; // stores ADC samples and PWM duty cycle values
 volatile bool samples_complete = false; // flag for blocking while sampling
 
 
@@ -64,15 +64,15 @@ static void saadc_event_callback(nrfx_saadc_evt_t const* event) {
 
     // determine the average of the samples
     uint32_t average = 0;
-    for (int i=0; i<BUFFER_SIZE; i++) {
+    for (int i = 0; i < BUFFER_SIZE; i++) {
       average += (uint16_t)samples[i];
     }
-    average = average/BUFFER_SIZE;
+    average = average / BUFFER_SIZE;
 
     // scale each sample based on the average value and recenter around 50%
-    for (int i=0; i<BUFFER_SIZE; i++) {
+    for (int i = 0; i < BUFFER_SIZE; i++) {
       // scaling determined experimentally
-      samples[i] = (((int32_t)samples[i] - average) * 10) + (ADC_MAX_COUNTS/2);
+      samples[i] = (((int32_t)samples[i] - average) * 10) + (ADC_MAX_COUNTS / 2);
     }
 
     // Signal completion
@@ -88,7 +88,7 @@ static void gpio_init(void) {
   // Microphone pin MUST be high drive
   nrf_gpio_pin_dir_set(LED_MIC, NRF_GPIO_PIN_DIR_OUTPUT);
   nrf_gpio_cfg(LED_MIC, NRF_GPIO_PIN_DIR_OUTPUT, NRF_GPIO_PIN_INPUT_DISCONNECT,
-      NRF_GPIO_PIN_NOPULL, NRF_GPIO_PIN_S0H1, NRF_GPIO_PIN_NOSENSE);
+    NRF_GPIO_PIN_NOPULL, NRF_GPIO_PIN_S0H1, NRF_GPIO_PIN_NOSENSE);
 
   // Enable microphone
   nrf_gpio_pin_set(LED_MIC);
@@ -114,7 +114,7 @@ static void adc_init(void) {
 }
 
 static void timer_init(void) {
-   // Set to 32 bit timer
+  // Set to 32 bit timer
   NRF_TIMER4->BITMODE = 3;
 
   // Set to 16 MHz clock
@@ -149,7 +149,21 @@ static void pwm_init(void) {
   // SPEAKER_OUT is the output pin, mark the others as NRFX_PWM_PIN_NOT_USED
   // Set the clock to 16 MHz
   // Set a countertop value based on sampling frequency and repetitions
-  // TODO
+
+  nrfx_pwm_config_t config;
+  config.output_pins[0] = SPEAKER_OUT;
+  config.output_pins[1] = NRFX_PWM_PIN_NOT_USED;
+  config.output_pins[2] = NRFX_PWM_PIN_NOT_USED;
+  config.output_pins[3] = NRFX_PWM_PIN_NOT_USED;
+  config.irq_priority = NRFX_PWM_DEFAULT_CONFIG_IRQ_PRIORITY;
+  config.base_clock = NRF_PWM_CLK_16MHz;
+  config.count_mode = NRF_PWM_MODE_UP;
+  config.top_value = 16000000 / SAMPLING_FREQUENCY / 2; // TODO also divide by the number of repetitions
+
+  config.load_mode = NRF_PWM_LOAD_COMMON;
+  config.step_mode = NRF_PWM_STEP_AUTO;
+
+  nrfx_pwm_init(&PWM_INST, &config, NULL);
 }
 
 static void play_audio_samples_looped(void) {
@@ -157,18 +171,25 @@ static void play_audio_samples_looped(void) {
   // Samples currently range from 0 to ADC_MAX_COUNTS
   // Samples should range from 0 to COUNTERTOP
   // Each sample should be rescaled in place
-  // TODO
+  for (int i = 0; i < BUFFER_SIZE; ++i) {
+    samples[i] = samples[i] * (NRF_PWM0->COUNTERTOP) / ADC_MAX_COUNTS;
+  }
 
   // Create the pwm sequence (nrf_pwm_sequence_t) using the samples
   // Do not make another buffer for this. You can reuse the sample buffer
   // You should set a non-zero repeat value (this is how many times each _sample_ repeats)
-  // TODO
+  nrf_pwm_sequence_t pwm_sequence = {
+    .values.p_common = samples,
+    .length = BUFFER_SIZE,
+    .repeats = 1,
+    .end_delay = 0,
+  };
 
   // Start playback of the samples and loop indefinitely
   // You will need to pass in a flag to loop the sound
   // The playback count here is the number of times the entire buffer will repeat
   //    (which doesn't matter if you set the loop flag)
-  // TODO
+  nrfx_pwm_simple_playback(&PWM_INST, &pwm_sequence, 1, NRFX_PWM_FLAG_LOOP);
 }
 
 
