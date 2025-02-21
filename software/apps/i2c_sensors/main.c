@@ -7,6 +7,7 @@
 #include <stdio.h>
 #include <math.h>
 
+#include "app_timer.h"
 #include "nrf_delay.h"
 #include "nrf_twi_mngr.h"
 
@@ -15,9 +16,28 @@
 
 // Global variables
 NRF_TWI_MNGR_DEF(twi_mngr_instance, 1, 0);
+APP_TIMER_DEF(timer);
+
+
+static void timer_callback(void* _unused) {
+  // Do things periodically here
+  float temp = lsm303agr_read_temperature();
+  printf("temp is %f c\n", temp);
+
+  lsm303agr_measurement_t acc = lsm303agr_read_accelerometer();
+  printf("acc x: %f y: %f z: %f\n", acc.x_axis, acc.y_axis, acc.z_axis);
+
+  lsm303agr_measurement_t mag = lsm303agr_read_magnetometer();
+  printf("mag x: %f y: %f z: %f\n", mag.x_axis, mag.y_axis, mag.z_axis);
+}
 
 int main(void) {
   printf("Board started!\n");
+
+  // initialize app timers
+  app_timer_init();
+  app_timer_create(&timer, APP_TIMER_MODE_REPEATED, timer_callback);
+  app_timer_start(timer, 32768, NULL);
 
   // Initialize I2C peripheral and driver
   nrf_drv_twi_config_t i2c_config = NRF_DRV_TWI_DEFAULT_CONFIG;

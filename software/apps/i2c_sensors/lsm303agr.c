@@ -47,6 +47,24 @@ static uint8_t i2c_reg_read(uint8_t i2c_addr, uint8_t reg_addr) {
 static void i2c_reg_write(uint8_t i2c_addr, uint8_t reg_addr, uint8_t data) {
   //TODO: implement me
   //Note: there should only be a single two-byte transfer to be performed
+
+  uint8_t msg[2] = { reg_addr, data };
+  nrf_twi_mngr_transfer_t const write_transfer[] = {
+    //TODO: implement me
+    NRF_TWI_MNGR_WRITE(i2c_addr, msg, 2, 0),
+  };
+
+  ret_code_t result = nrf_twi_mngr_perform(i2c_manager, NULL, write_transfer, 1, NULL);
+  if (result != NRF_SUCCESS) {
+    // Likely error codes:
+    //  NRF_ERROR_INTERNAL            (0x0003) - something is wrong with the driver itself
+    //  NRF_ERROR_INVALID_ADDR        (0x0010) - buffer passed was in Flash instead of RAM
+    //  NRF_ERROR_BUSY                (0x0011) - driver was busy with another transfer still
+    //  NRF_ERROR_DRV_TWI_ERR_OVERRUN (0x8200) - data was overwritten during the transaction
+    //  NRF_ERROR_DRV_TWI_ERR_ANACK   (0x8201) - i2c device did not acknowledge its address
+    //  NRF_ERROR_DRV_TWI_ERR_DNACK   (0x8202) - i2c device did not acknowledge a data byte
+    printf("I2C transaction failed! Error: %lX\n", result);
+  }
 }
 
 // Initialize and configure the LSM303AGR accelerometer/magnetometer
@@ -111,22 +129,72 @@ void lsm303agr_init(const nrf_twi_mngr_t* i2c) {
 //
 // Return measurement as floating point value in degrees C
 float lsm303agr_read_temperature(void) {
-  //TODO: implement me
+  uint8_t low = i2c_reg_read(LSM303AGR_ACC_ADDRESS, OUT_TEMP_L_A);
+  uint8_t high = i2c_reg_read(LSM303AGR_ACC_ADDRESS, OUT_TEMP_H_A);
+  int16_t reading = ((uint16_t)high << 8) | (uint16_t)low;
 
-  return 0.0;
+  printf("Temperature reading: %X\n", reading);
+
+  // Convert to degrees C
+  float temp = (float)reading * (1.0 / 256.0) + 25.0;
+
+  return temp;
 }
 
 lsm303agr_measurement_t lsm303agr_read_accelerometer(void) {
   //TODO: implement me
+  uint8_t x_l = i2c_reg_read(LSM303AGR_ACC_ADDRESS, OUT_X_L_A);
+  uint8_t x_h = i2c_reg_read(LSM303AGR_ACC_ADDRESS, OUT_X_H_A);
+  uint8_t y_l = i2c_reg_read(LSM303AGR_ACC_ADDRESS, OUT_Y_L_A);
+  uint8_t y_h = i2c_reg_read(LSM303AGR_ACC_ADDRESS, OUT_Y_H_A);
+  uint8_t z_l = i2c_reg_read(LSM303AGR_ACC_ADDRESS, OUT_Z_L_A);
+  uint8_t z_h = i2c_reg_read(LSM303AGR_ACC_ADDRESS, OUT_Z_H_A);
 
-  lsm303agr_measurement_t measurement = { 0 };
+  int16_t x = ((uint16_t)x_h << 8) | (uint16_t)x_l;
+  int16_t y = ((uint16_t)y_h << 8) | (uint16_t)y_l;
+  int16_t z = ((uint16_t)z_h << 8) | (uint16_t)z_l;
+
+  x = x >> 6;
+  y = y >> 6;
+  z = z >> 6;
+
+  float x_val = (float)x * 3.9 * 0.001;
+  float y_val = (float)y * 3.9 * 0.001;
+  float z_val = (float)z * 3.9 * 0.001;
+
+  lsm303agr_measurement_t measurement = {
+    .x_axis = x_val,
+    .y_axis = y_val,
+    .z_axis = z_val
+  };
   return measurement;
 }
 
 lsm303agr_measurement_t lsm303agr_read_magnetometer(void) {
   //TODO: implement me
 
-  lsm303agr_measurement_t measurement = { 0 };
+  uint8_t x_l = i2c_reg_read(LSM303AGR_MAG_ADDRESS, OUTX_L_REG_M);
+  uint8_t x_h = i2c_reg_read(LSM303AGR_MAG_ADDRESS, OUTX_H_REG_M);
+  uint8_t y_l = i2c_reg_read(LSM303AGR_MAG_ADDRESS, OUTY_L_REG_M);
+  uint8_t y_h = i2c_reg_read(LSM303AGR_MAG_ADDRESS, OUTY_H_REG_M);
+  uint8_t z_l = i2c_reg_read(LSM303AGR_MAG_ADDRESS, OUTZ_L_REG_M);
+  uint8_t z_h = i2c_reg_read(LSM303AGR_MAG_ADDRESS, OUTZ_H_REG_M);
+
+  int16_t x = ((uint16_t)x_h << 8) | (uint16_t)x_l;
+  int16_t y = ((uint16_t)y_h << 8) | (uint16_t)y_l;
+  int16_t z = ((uint16_t)z_h << 8) | (uint16_t)z_l;
+
+  float sens = 1.5 * 0.1; // milligauss per LSB, times microtesla per milligauss
+  // bias is 0
+  float x_ut = (float)x * sens;
+  float y_ut = (float)y * sens;
+  float z_ut = (float)z * sens;
+
+  lsm303agr_measurement_t measurement = {
+    .x_axis = x_ut,
+    .y_axis = y_ut,
+    .z_axis = z_ut
+  };
 
   return measurement;
 }
