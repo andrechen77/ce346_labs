@@ -27,6 +27,9 @@ static void timer_callback(void* _unused) {
   lsm303agr_measurement_t acc = lsm303agr_read_accelerometer();
   printf("acc x: %f y: %f z: %f\n", acc.x_axis, acc.y_axis, acc.z_axis);
 
+  float tilt = acceleration_to_tilt(acc.x_axis, acc.y_axis, acc.z_axis);
+  printf("tilt is %f degrees\n", tilt);
+
   lsm303agr_measurement_t mag = lsm303agr_read_magnetometer();
   printf("mag x: %f y: %f z: %f\n", mag.x_axis, mag.y_axis, mag.z_axis);
 }

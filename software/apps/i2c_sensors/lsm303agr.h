@@ -99,6 +99,8 @@ float lsm303agr_read_temperature(void);
 // Return measurements as floating point values in g's
 lsm303agr_measurement_t lsm303agr_read_accelerometer(void);
 
+float acceleration_to_tilt(float x, float y, float z);
+
 // Read all three axes on the magnetometer
 //
 // Return measurements as floating point values in uT

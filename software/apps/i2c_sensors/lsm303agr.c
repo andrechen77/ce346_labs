@@ -8,6 +8,7 @@
 
 #include "lsm303agr.h"
 #include "nrf_delay.h"
+#include <math.h>
 
 // Pointer to an initialized I2C instance to use for transactions
 static const nrf_twi_mngr_t* i2c_manager = NULL;
@@ -168,6 +169,11 @@ lsm303agr_measurement_t lsm303agr_read_accelerometer(void) {
     .z_axis = z_val
   };
   return measurement;
+}
+
+float acceleration_to_tilt(float x, float y, float z) {
+  float phi = atan(sqrt(x * x + y * y) / z);
+  return phi / M_PI * 180.0; // convert to degrees
 }
 
 lsm303agr_measurement_t lsm303agr_read_magnetometer(void) {
