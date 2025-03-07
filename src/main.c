@@ -4,7 +4,7 @@
 #include <zephyr/device.h>
 #include <zephyr/drivers/gpio.h>
 #include <stdio.h>
-
+#include "pwm.h"
 
 struct gpio_callback gpio_cb;
 void interrupt_handler(const struct device* dev, struct gpio_callback* cb, uint32_t pins) {
@@ -14,6 +14,8 @@ void interrupt_handler(const struct device* dev, struct gpio_callback* cb, uint3
 int main(void) {
 	fprintf(stderr, "Hello, there!\n");
 	k_sleep(K_MSEC(10)); // let the RTOS do its thing
+
+	pwm();
 
 	// gpio_pin_configure(EDGE_P8_DEV, EDGE_P8_IDX, GPIO_OUTPUT_LOW);
 
