@@ -29,26 +29,29 @@ void adc_thread(void* p1, void* p2, void* p3) {
 	}
 }
 
+int ble_main(void);
 
 int main(void) {
 	fprintf(stderr, "Hello, there!\n");
 	k_sleep(K_MSEC(10)); // let the RTOS do its thing
 
-	// Initialize the ADC
-	if (adc_begin() != 0) {
-		fprintf(stderr, "Error initializing ADC\n");
-		return -1;
-	}
-	fprintf(stderr, "ADC initialized\n");
+	ble_main();
 
-	// Initialize the PWM
-	pwm_init();
-	fprintf(stderr, "PWM initialized\n");
+	// // Initialize the ADC
+	// if (adc_begin() != 0) {
+	// 	fprintf(stderr, "Error initializing ADC\n");
+	// 	return -1;
+	// }
+	// fprintf(stderr, "ADC initialized\n");
 
-	k_thread_create(&adc_thread_data, adc_thread_stack,
-		K_THREAD_STACK_SIZEOF(adc_thread_stack),
-		adc_thread, NULL, NULL, NULL,
-		ADC_THREAD_PRIORITY, 0, K_NO_WAIT);
+	// // Initialize the PWM
+	// pwm_init();
+	// fprintf(stderr, "PWM initialized\n");
+
+	// k_thread_create(&adc_thread_data, adc_thread_stack,
+	// 	K_THREAD_STACK_SIZEOF(adc_thread_stack),
+	// 	adc_thread, NULL, NULL, NULL,
+	// 	ADC_THREAD_PRIORITY, 0, K_NO_WAIT);
 
 	// while (1) {
 	// 	pwm_set_duty(0);

@@ -1,6 +1,7 @@
 {
 	"files.associations": {
 		"kernel.h": "c",
-		"ultrasonic.h": "c"
+		"ultrasonic.h": "c",
+		"types.h": "c"
 	}
 }
