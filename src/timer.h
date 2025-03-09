@@ -5,3 +5,5 @@
 typedef void (*callback_t)(void);
 
 uint32_t read_timer_us();
+
+uint32_t read_timer_s();
