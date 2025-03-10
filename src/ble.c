@@ -17,6 +17,7 @@
 #include <zephyr/bluetooth/uuid.h>
 #include <zephyr/bluetooth/gatt.h>
 #include <zephyr/bluetooth/services/ias.h>
+#include "cmd.h"
 
  /* Custom Service Variables */
 #define BT_UUID_CUSTOM_SERVICE_VAL \
@@ -29,17 +30,17 @@ static const struct bt_uuid_128 service_uuid = BT_UUID_INIT_128(
 #define BT_UUID_READ_CHAR        BT_UUID_DECLARE_128(BT_UUID_128_ENCODE(0x12345678, 0x1234, 0x5678, 0x9ABC, 0xDEF012345679))
 #define BT_UUID_WRITE_CHAR       BT_UUID_DECLARE_128(BT_UUID_128_ENCODE(0x12345678, 0x1234, 0x5678, 0x9ABC, 0xDEF012345680))
 
-#define READ_BUF_SIZE 512
+#define BUF_SIZE 512
 
-static char read_value[READ_BUF_SIZE];
-static uint8_t write_value[20];
+static char read_value[BUF_SIZE];
+static uint8_t write_value[BUF_SIZE];
 
 static ssize_t read_char_callback(struct bt_conn *conn,
                                     const struct bt_gatt_attr *attr,
                                     void *buf, uint16_t len, uint16_t offset)
 {
     fprintf(stderr, "Received Read\n");
-    info_to_buf_str(read_value, READ_BUF_SIZE);
+    info_to_buf_str(read_value, BUF_SIZE);
     return bt_gatt_attr_read(conn, attr, buf, len, offset, read_value, sizeof(read_value));
 }
 
@@ -53,8 +54,22 @@ static ssize_t write_char_callback(struct bt_conn *conn,
     }
 
     memcpy(write_value + offset, buf, len);
+
+    // terminate strings
+    if (offset + len + 1 >= BUF_SIZE) {
+        write_value[BUF_SIZE - 1] = 0;
+    } else {
+        write_value[offset + len] = 0;
+    }
+
     printk("Received Write: %.*s\n", len, (char *)buf);
-    
+
+    char* orig_write_value = write_value;
+    execute_command(write_value, BUF_SIZE);
+
+    char** bruh = &write_value;
+    *bruh = orig_write_value;
+
     return len;
 }
 
