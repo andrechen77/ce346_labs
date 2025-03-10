@@ -4,10 +4,12 @@
 K_MUTEX_DEFINE(my_mutex);
 
 static info_t fish_info = {
-    60, // once an hour
+    60 * 60, // once an hour
     5, // spin for 5 seconds
     0, // haven't fed yet
-    60, // will feed in an hour
+    0, // haven't fed yet
+    60 * 60, // will feed in an hour
+    60 * 60, // will feed in an hour
     0, // assume foo isn't low for now
     &my_mutex
 };

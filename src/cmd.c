@@ -1,6 +1,5 @@
 #include "cmd.h"
 #include "info.h"
-// #include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
 
@@ -30,6 +29,7 @@ void execute_command(char* cmd, size_t cmd_size) {
 
         k_mutex_lock(info->mut, K_FOREVER);
         info->feed_freq_sec = new_freq;
+        info->_next_feed_timestamp_sec = info->_last_feed_timestamp_sec + info->feed_freq_sec;
         k_mutex_unlock(info->mut);
         return;
     } else if (!strcmp(action, "dur")) {
