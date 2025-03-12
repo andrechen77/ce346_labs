@@ -21,15 +21,26 @@ K_THREAD_STACK_DEFINE(timer_feed_thread_stack, THREAD_STACK_SIZE);
 static struct k_thread timer_feed_thread_data;
 
 void adc_thread(void* p1, void* p2, void* p3) {
+	bool has_lock = false;
 	while (1) {
 		int val = adcread();
 		if (val > ADC_THRESHOLD) {
 			// set duty to something
-			printf("Hello world!\n");
-			pwm_set_duty((float)val / 4096.0);
+			if (has_lock) {
+				pwm_set_duty((float)val / 4096.0);
+			} else if (pwm_lock(100) == 0) {
+				has_lock = true;
+				pwm_set_duty((float)val / 4096.0);
+			} else {
+				has_lock = false;
+			}
 		} else {
 			// set duty to 0
-			pwm_set_duty(0);
+			if (has_lock) {
+				pwm_set_duty(0);
+				pwm_unlock();
+				has_lock = false;
+			}
 		}
 		k_sleep(K_MSEC(100));
 	}
@@ -43,13 +54,26 @@ void timer_feed_thread(void* p1, void* p2, void* p3) {
 		uint32_t cur_time = read_timer_s();
 		uint32_t next_feed_time = info->_next_feed_timestamp_sec;
 		uint32_t feed_dur = info->feed_duration_sec;
+		fprintf(stderr, "next feed time: %d, current time %d\n", next_feed_time, cur_time);
 		k_mutex_unlock(info->mut);
 
 		if (cur_time >= next_feed_time) {
 			// feed
-			pwm_set_duty(0.5);
-			k_sleep(K_SECONDS(feed_dur));
-			pwm_set_duty(0);
+			if (pwm_lock(1) == 0) {
+				fprintf(stderr, "Feeding for %d seconds\n", feed_dur);
+				pwm_set_duty(0.5);
+				k_sleep(K_SECONDS(feed_dur));
+				pwm_set_duty(0);
+				pwm_unlock();
+			} else {
+				fprintf(stderr, "timer feed:Failed to lock PWM\n");
+				k_sleep(K_SECONDS(feed_dur));
+			}
+
+			k_mutex_lock(info->mut, K_FOREVER);
+			info->_last_feed_timestamp_sec = cur_time;
+			info->_next_feed_timestamp_sec = cur_time + info->feed_freq_sec;
+			k_mutex_unlock(info->mut);
 		}
 
 		k_sleep(K_MSEC(100));
@@ -62,6 +86,9 @@ int main(void) {
 	fprintf(stderr, "Hello, there!\n");
 	k_sleep(K_MSEC(10)); // let the RTOS do its thing
 
+	pwm_init();
+	pwm_set_duty(0);
+
 	if (ble_init()) {
 		fprintf(stderr, "Error initializing BLE\n");
 		return -1;
@@ -70,43 +97,12 @@ int main(void) {
 
 	info_t* info = get_info();
 
-	while (1) {
-		// simulate counting down to feeding
-		k_mutex_lock(info->mut, K_FOREVER);
-
-		uint32_t cur_time = read_timer_s();
-
-		long remaining_time = (long)(info->_last_feed_timestamp_sec + info->feed_freq_sec) - (long)cur_time;
-
-		if (remaining_time < 0) {
-			info->_last_feed_timestamp_sec = cur_time;
-			info->next_feed_sec = info->feed_freq_sec;
-			info->_next_feed_timestamp_sec = info->_last_feed_timestamp_sec + info->feed_freq_sec;
-		} else {
-			info->next_feed_sec = remaining_time;
-		}
-
-		info->last_feed_sec = cur_time - info->_last_feed_timestamp_sec;
-
-		k_mutex_unlock(info->mut);
-		k_sleep(K_MSEC(100));
-	}
-
-	// TODO: Fix the pins so it doesn't interfere with BLE!!
-
 	// Initialize the ADC
 	if (adc_begin() != 0) {
 		fprintf(stderr, "Error initializing ADC\n");
 		return -1;
 	}
 	fprintf(stderr, "ADC initialized\n");
-
-	// // Initialize the ADC
-	// if (adc_begin() != 0) {
-	// 	fprintf(stderr, "Error initializing ADC\n");
-	// 	return -1;
-	// }
-	// fprintf(stderr, "ADC initialized\n");
 
 	k_thread_create(&adc_thread_data, adc_thread_stack,
 		K_THREAD_STACK_SIZEOF(adc_thread_stack),
@@ -118,30 +114,18 @@ int main(void) {
 		timer_feed_thread, NULL, NULL, NULL,
 		THREAD_PRIORITY, 0, K_NO_WAIT);
 
-	// while (1) {
-	// 	pwm_set_duty(0);
-	// 	k_sleep(K_SECONDS(1));
-	// 	pwm_set_duty(0.5);
-	// 	k_sleep(K_SECONDS(1));
-	// }
+	while (1) {
+		// simulate counting down to feeding
+		k_mutex_lock(info->mut, K_FOREVER);
 
+		uint32_t cur_time = read_timer_s();
 
-	// while (1) {
-	// 	int reading = adcread();
-	// 	fprintf(stderr, "ADC reading: %d\n", reading);
-	// 	k_sleep(K_SECONDS(1));
-	// }
+		info->next_feed_sec = info->_next_feed_timestamp_sec - cur_time;
+		info->last_feed_sec = cur_time - info->_last_feed_timestamp_sec;
 
-	// fprintf(stderr, "Initializing ultrasonic sensors\n");
-	// ultrasonic_init();
-	// fprintf(stderr, "Ultrasonic sensors initialized\n");
-	// k_sleep(K_MSEC(1000));
-
-	// while (1) {
-	// 	double distance = sample_sensors_distance_cm();
-	// 	fprintf(stderr, "Distance: %f cm\n", distance);
-	// 	k_sleep(K_MSEC(1000));
-	// }
+		k_mutex_unlock(info->mut);
+		k_sleep(K_MSEC(100));
+	}
 
 	while (1) {
 		k_sleep(K_SECONDS(1));
