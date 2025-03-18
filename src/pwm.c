@@ -17,7 +17,7 @@ void pwm_init(void) {
 }
 
 void pwm_set_duty(float duty_percent) {
-	fprintf(stderr, "Setting PWM duty cycle to %f\n", duty_percent);
+	fprintf(stderr, "Setting PWM duty cycle to %f\n", (double)duty_percent);
 	pwm_set(pwm_dev, 0, PWM_PERIOD_US, (float)PWM_PERIOD_US * duty_percent, 0);
 }
 

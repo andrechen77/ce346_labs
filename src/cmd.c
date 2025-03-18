@@ -2,8 +2,13 @@
 #include "info.h"
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 #define BUF_SIZE 512
+
+// function prototype because the string.h header doesn't have it enabled for
+// some reason
+char* strsep(char**, const char*);
 
 void execute_command(char* cmd, size_t cmd_size) {
     char* password;
