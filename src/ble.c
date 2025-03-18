@@ -27,59 +27,77 @@ static const struct bt_uuid_128 service_uuid = BT_UUID_INIT_128(
     BT_UUID_CUSTOM_SERVICE_VAL
 );
 
-#define BT_UUID_READ_CHAR           BT_UUID_DECLARE_128(BT_UUID_128_ENCODE(0x12345678, 0x1234, 0x5678, 0x9ABC, 0xDEF012345679))
-#define BT_UUID_WRITE_CHAR          BT_UUID_DECLARE_128(BT_UUID_128_ENCODE(0x12345678, 0x1234, 0x5678, 0x9ABC, 0xDEF012345680))
-#define BT_UUID_GATT_CHRC_USER_DESC BT_UUID_DECLARE_128(BT_UUID_128_ENCODE(0x12345678, 0x1234, 0x5678, 0x9ABC, 0xDEF012345681))
+#define BT_UUID_SETTINGS_STR_CHAR   BT_UUID_DECLARE_128(BT_UUID_128_ENCODE(0x12345678, 0x1234, 0x5678, 0x9ABC, 0xDEF012345679))
+#define BT_UUID_CMD_CHAR            BT_UUID_DECLARE_128(BT_UUID_128_ENCODE(0x12345678, 0x1234, 0x5678, 0x9ABC, 0xDEF012345680))
+#define BT_UUID_FOOD_NOTIFY_CHAR    BT_UUID_DECLARE_128(BT_UUID_128_ENCODE(0x12345678, 0x1234, 0x5678, 0x9ABC, 0xDEF012345681))
 
 #define BUF_SIZE 512
 
-static char read_value[BUF_SIZE];
-static uint8_t write_value[BUF_SIZE];
+static uint8_t* food_is_low;
+static char read_settings_buffer[BUF_SIZE];
+static uint8_t cmd_buffer[BUF_SIZE];
 
-static ssize_t read_char_callback(struct bt_conn* conn,
+static ssize_t read_settings_callback(struct bt_conn* conn,
     const struct bt_gatt_attr* attr,
     void* buf, uint16_t len, uint16_t offset) {
     fprintf(stderr, "Received Read\n");
-    info_to_buf_str(read_value, BUF_SIZE);
-    return bt_gatt_attr_read(conn, attr, buf, len, offset, read_value, sizeof(read_value));
+    info_to_buf_str(read_settings_buffer, BUF_SIZE);
+    return bt_gatt_attr_read(conn, attr, buf, len, offset, read_settings_buffer, sizeof(read_settings_buffer));
 }
 
-static ssize_t write_char_callback(struct bt_conn* conn,
+static ssize_t write_cmd_callback(struct bt_conn* conn,
     const struct bt_gatt_attr* attr,
     const void* buf, uint16_t len, uint16_t offset,
     uint8_t flags) {
-    if (offset + len > sizeof(write_value)) {
+    if (offset + len > sizeof(cmd_buffer)) {
         return BT_GATT_ERR(BT_ATT_ERR_INVALID_OFFSET);
     }
 
-    memcpy(write_value + offset, buf, len);
+    memcpy(cmd_buffer + offset, buf, len);
 
     // terminate strings
     if (offset + len + 1 >= BUF_SIZE) {
-        write_value[BUF_SIZE - 1] = 0;
+        cmd_buffer[BUF_SIZE - 1] = 0;
     } else {
-        write_value[offset + len] = 0;
+        cmd_buffer[offset + len] = 0;
     }
 
     fprintf(stderr, "Received Write: %.*s\n", len, (char*)buf);
 
-    char* orig_write_value = write_value;
-    execute_command(write_value, BUF_SIZE);
+    char* orig_write_value = cmd_buffer;
+    execute_command(cmd_buffer, BUF_SIZE);
 
-    char** bruh = &write_value;
+    char** bruh = &cmd_buffer;
     *bruh = orig_write_value;
 
     return len;
 }
 
+// CCC callback function - will be called when notifications are enabled/disabled
+static void food_notify_ccc_cfg_changed(const struct bt_gatt_attr* attr, uint16_t value) {
+    bool notifications_enabled = (value == BT_GATT_CCC_NOTIFY);
+    fprintf(stderr, "Food notifications %s\n", notifications_enabled ? "enabled" : "disabled");
+}
+
+static ssize_t read_food_notify(struct bt_conn* conn, const struct bt_gatt_attr* attr,
+    void* buf, uint16_t len, uint16_t offset) {
+
+    return bt_gatt_attr_read(conn, attr, buf, len, offset, food_is_low,
+        sizeof(*food_is_low));
+}
+
 BT_GATT_SERVICE_DEFINE(custom_svc,
     BT_GATT_PRIMARY_SERVICE(&service_uuid),
-    BT_GATT_CHARACTERISTIC(BT_UUID_READ_CHAR, BT_GATT_CHRC_READ,
-        BT_GATT_PERM_READ, read_char_callback, NULL, NULL),
-    BT_GATT_DESCRIPTOR(BT_UUID_GATT_CHRC_USER_DESC, BT_GATT_PERM_READ,
-        NULL, NULL, "All feeder settings"),
-    BT_GATT_CHARACTERISTIC(BT_UUID_WRITE_CHAR, BT_GATT_CHRC_WRITE,
-        BT_GATT_PERM_WRITE, NULL, write_char_callback, write_value),
+    BT_GATT_CHARACTERISTIC(BT_UUID_SETTINGS_STR_CHAR, BT_GATT_CHRC_READ,
+        BT_GATT_PERM_READ, read_settings_callback, NULL, NULL),
+    BT_GATT_CHARACTERISTIC(BT_UUID_CMD_CHAR, BT_GATT_CHRC_WRITE,
+        BT_GATT_PERM_WRITE, NULL, write_cmd_callback, cmd_buffer),
+    BT_GATT_CHARACTERISTIC(BT_UUID_FOOD_NOTIFY_CHAR,
+        BT_GATT_CHRC_READ | BT_GATT_CHRC_NOTIFY,
+        BT_GATT_PERM_READ,
+        read_food_notify, NULL, NULL),
+    BT_GATT_CCC(food_notify_ccc_cfg_changed,
+        BT_GATT_PERM_READ | BT_GATT_PERM_WRITE),
     );
 
 static const struct bt_data ad[] = {
@@ -133,6 +151,8 @@ int ble_init(void) {
     }
 
     fprintf(stderr, "Bluetooth initialized\n");
+
+    food_is_low = &get_info()->is_food_low;
 
     bt_ready();
     return 0;

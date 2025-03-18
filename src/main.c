@@ -91,6 +91,7 @@ void food_level_thread(void* p1, void* p2, void* p3) {
 
 		k_mutex_lock(info->mut, K_FOREVER);
 		info->is_food_low = distance >= 25;
+		bt_gatt_notify(NULL, &custom_svc.attrs[4], &get_info()->is_food_low, 1);
 		k_mutex_unlock(info->mut);
 
 		k_sleep(K_SECONDS(10));
