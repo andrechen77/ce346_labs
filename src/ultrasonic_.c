@@ -18,7 +18,7 @@
 #define NUM_MEASUREMENT_SAMPLES_PER_SENSOR 1
 
 ultrasonic_t ultrasonic_sensors[] = {
-	{.trig_pin = EDGE_P7_IDX, .echo_pin = EDGE_P8_IDX, .timeout_us = ULTRASONIC_TIMEOUT_US},
+	{.trig_pin = EDGE_P12_IDX, .echo_pin = EDGE_P13_IDX, .timeout_us = ULTRASONIC_TIMEOUT_US},
 	// {.trig_pin = EDGE_P9_IDX, .echo_pin = EDGE_P10_IDX, .timeout_us = ULTRASONIC_TIMEOUT_US},
 };
 int num_sensors = sizeof(ultrasonic_sensors) / sizeof(ultrasonic_sensors[0]);

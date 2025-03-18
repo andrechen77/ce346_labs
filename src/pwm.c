@@ -2,7 +2,7 @@
 #include <zephyr/device.h>
 #include <zephyr/drivers/pwm.h>
 
-#define PWM_DEVICE_NAME "PWM_0"
+#define PWM_DEVICE_NAME "PWM_1"
 #define PWM_PERIOD_US 1000 // 1 ms period
 
 const struct device* pwm_dev;

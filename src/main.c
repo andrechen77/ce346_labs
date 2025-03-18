@@ -8,6 +8,7 @@
 #include "timer.h"
 #include "pwm.h"
 #include "adc.h"
+#include "display.h"
 #include "ble.h"
 
 #define THREAD_STACK_SIZE 1024  // Adjust based on usage
@@ -29,18 +30,29 @@ void adc_thread(void* p1, void* p2, void* p3) {
 		int val = adcread();
 		if (val > ADC_THRESHOLD) {
 			// set duty to something
+			// if (has_lock) {
+			// 	pwm_set_duty((float)val / 4096.0f);
+			// } else if (pwm_lock(100) == 0) {
+			// 	has_lock = true;
+			// 	pwm_set_duty((float)val / 4096.0f);
+			// } else {
+			// 	has_lock = false;
+			// }
+			if (!has_lock) {
+				if (pwm_lock(100) == 0) {
+					has_lock = true;
+				}
+			}
 			if (has_lock) {
-				pwm_set_duty((float)val / 4096.0f);
-			} else if (pwm_lock(100) == 0) {
-				has_lock = true;
-				pwm_set_duty((float)val / 4096.0f);
-			} else {
-				has_lock = false;
+				float percentage = (float)val / 4096.0f;
+				pwm_set_duty(percentage);
+				write_row_pattern((int)(percentage * 25));
 			}
 		} else {
 			// set duty to 0
 			if (has_lock) {
 				pwm_set_duty(0);
+				write_row_pattern(0);
 				pwm_unlock();
 				has_lock = false;
 			}
@@ -104,6 +116,9 @@ int main(void) {
 	fprintf(stderr, "Hello, there!\n");
 	k_sleep(K_MSEC(10)); // let the RTOS do its thing
 
+	display_init();
+	write_row_pattern(25);
+
 	pwm_init();
 	pwm_set_duty(0);
 
@@ -144,11 +159,18 @@ int main(void) {
 		k_mutex_lock(info->mut, K_FOREVER);
 
 		uint32_t cur_time = read_timer_s();
+		uint32_t period = info->feed_freq_sec;
 
 		info->next_feed_sec = info->_next_feed_timestamp_sec - cur_time;
 		info->last_feed_sec = cur_time - info->_last_feed_timestamp_sec;
 
+		float percentage = (float)info->last_feed_sec / (float)(info->next_feed_sec + info->last_feed_sec);
+
 		k_mutex_unlock(info->mut);
+
+		write_ring_pattern((int)(percentage * 16), 0, cur_time % 2);
+		// write_row_pattern(cur_time);
+
 		k_sleep(K_MSEC(100));
 	}
 
