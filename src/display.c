@@ -24,6 +24,16 @@ static const struct display_buffer_descriptor buf_desc = {
 
 const struct device* dev;
 
+static struct k_mutex display_mutex;
+
+int display_lock(void) {
+	k_mutex_lock(&display_mutex, K_NO_WAIT);
+}
+
+void display_unlock(void) {
+	k_mutex_unlock(&display_mutex);
+}
+
 int display_update(void) {
 	int ret;
 	ret = display_write(dev, 0, 0, &buf_desc, display_buf);
@@ -44,6 +54,8 @@ int display_update(void) {
 }
 
 int display_init(void) {
+	k_mutex_init(&display_mutex);
+
 	int ret;
 	dev = DEVICE_DT_GET_ONE(nordic_nrf_led_matrix);
 

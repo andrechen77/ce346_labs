@@ -9,3 +9,7 @@ int display_init(void);
 void write_ring_pattern(uint8_t outer_ring, uint8_t inner_ring, bool center);
 
 void write_row_pattern(uint8_t n);
+
+int display_lock(void);
+
+void display_unlock(void);

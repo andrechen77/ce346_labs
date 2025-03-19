@@ -19,7 +19,7 @@
 
 ultrasonic_t ultrasonic_sensors[] = {
 	{.trig_pin = EDGE_P12_IDX, .echo_pin = EDGE_P13_IDX, .timeout_us = ULTRASONIC_TIMEOUT_US},
-	// {.trig_pin = EDGE_P9_IDX, .echo_pin = EDGE_P10_IDX, .timeout_us = ULTRASONIC_TIMEOUT_US},
+	// {.trig_pin = EDGE_P16_IDX, .echo_pin = EDGE_P19_IDX, .timeout_us = ULTRASONIC_TIMEOUT_US},
 };
 int num_sensors = sizeof(ultrasonic_sensors) / sizeof(ultrasonic_sensors[0]);
 
@@ -63,6 +63,7 @@ double sample_distance_cm(ultrasonic_t* sensor) {
 
 	// prepare the data structure
 	sensor->ready = 0;
+	uint32_t start_time = read_timer_us();
 
 	// trigger a pulse
 	gpio_pin_set(gpio_dev, sensor->trig_pin, 0);
@@ -72,13 +73,17 @@ double sample_distance_cm(ultrasonic_t* sensor) {
 	gpio_pin_set(gpio_dev, sensor->trig_pin, 0);
 
 	while (sensor->ready != 2) {
+		if (read_timer_us() - start_time > sensor->timeout_us) {
+			fprintf(stderr, "distance sampling timed out\n");
+			return INFINITY;
+		}
 		k_yield();
 	}
 
 	// calculate distance
 	double duration_us = sensor->echo_end_us - sensor->echo_start_us;
 	double distance_cm = duration_us * SOUND_SPEED / 2;
-	// fprintf(stderr, "distance as int: %d cm\n", (int)(distance_cm));
+	fprintf(stderr, "one sensor says distance: %f cm\n", distance_cm);
 
 	return distance_cm;
 }

@@ -25,7 +25,8 @@ K_THREAD_STACK_DEFINE(food_level_thread_stack, THREAD_STACK_SIZE);
 static struct k_thread food_level_thread_data;
 
 void adc_thread(void* p1, void* p2, void* p3) {
-	bool has_lock = false;
+	bool has_pwm_lock = false;
+	bool has_disp_lock = false;
 	while (1) {
 		int val = adcread();
 		if (val > ADC_THRESHOLD) {
@@ -38,23 +39,35 @@ void adc_thread(void* p1, void* p2, void* p3) {
 			// } else {
 			// 	has_lock = false;
 			// }
-			if (!has_lock) {
+			if (!has_pwm_lock) {
 				if (pwm_lock(100) == 0) {
-					has_lock = true;
+					has_pwm_lock = true;
 				}
 			}
-			if (has_lock) {
+			if (has_pwm_lock) {
 				float percentage = (float)val / 4096.0f;
 				pwm_set_duty(percentage);
-				write_row_pattern((int)(percentage * 25));
+
+				if (!has_disp_lock) {
+					if (display_lock() == 0) {
+						has_disp_lock = true;
+					}
+				}
+				if (has_disp_lock) {
+					write_row_pattern((int)(percentage * 25));
+				}
 			}
 		} else {
 			// set duty to 0
-			if (has_lock) {
+			if (has_pwm_lock) {
 				pwm_set_duty(0);
-				write_row_pattern(0);
 				pwm_unlock();
-				has_lock = false;
+				has_pwm_lock = false;
+			}
+			if (has_disp_lock) {
+				write_row_pattern(0);
+				display_unlock();
+				has_disp_lock = false;
 			}
 		}
 		k_sleep(K_MSEC(100));
@@ -102,11 +115,11 @@ void food_level_thread(void* p1, void* p2, void* p3) {
 		fprintf(stderr, "Distance: %f\n", distance);
 
 		k_mutex_lock(info->mut, K_FOREVER);
-		info->is_food_low = distance >= 25;
+		info->is_food_low = distance >= 15.0;
 		bt_gatt_notify(NULL, &custom_svc.attrs[4], &get_info()->is_food_low, 1);
 		k_mutex_unlock(info->mut);
 
-		k_sleep(K_SECONDS(10));
+		k_sleep(K_SECONDS(3));
 	}
 }
 
@@ -168,7 +181,10 @@ int main(void) {
 
 		k_mutex_unlock(info->mut);
 
-		write_ring_pattern((int)(percentage * 16), 0, cur_time % 2);
+		if (display_lock() == 0) {
+			write_ring_pattern((int)(percentage * 16), 0, cur_time % 2);
+			display_unlock();
+		}
 		// write_row_pattern(cur_time);
 
 		k_sleep(K_MSEC(100));
